@@ -1,0 +1,64 @@
+---
+- name: AWX web server demo
+  hosts: webservers          # or "all" if you prefer
+  become: true
+
+  vars:
+    demo_message: "Hello from AWX!"
+    demo_page: /var/www/html/index.html
+
+  tasks:
+    - name: Update apt cache (Debian/Ubuntu)
+    # Skip on RHEL-family
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Update yum cache (RHEL/CentOS/Rocky)
+      ansible.builtin.yum:
+        update_cache: yes
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Install Nginx
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Ensure Nginx is enabled and running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Create web root directory (just in case)
+      ansible.builtin.file:
+        path: "{{ demo_page | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy demo index.html
+      ansible.builtin.copy:
+        dest: "{{ demo_page }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          <html>
+          <head>
+              <title>AWX Demo</title>
+          </head>
+          <body>
+              <h1>{{ demo_message }}</h1>
+              <p>This page was deployed by Ansible AWX.</p>
+              <p>Host: {{ inventory_hostname }}</p>
+          </body>
+          </html>
+
+    - name: Show URL to test
+      ansible.builtin.debug:
+        msg: >
+          Open http://{{ ansible_host | default(inventory_hostname) }}/
+          in your browser to see the AWX demo page.
